@@ -606,6 +606,7 @@ void CCharacter::ReflectX(CDbRoom *pRoom)
 			case CCharacterCommand::CC_GetEntityDirection:
 			case CCharacterCommand::CC_FaceTowards:
 			case CCharacterCommand::CC_WaitForWeapon:
+			case CCharacterCommand::CC_VarSetAt:
 				command->x = (pRoom->wRoomCols-1) - command->x;
 			break;
 			case CCharacterCommand::CC_WaitForRect:
@@ -670,6 +671,7 @@ void CCharacter::ReflectY(CDbRoom *pRoom)
 			case CCharacterCommand::CC_GetEntityDirection:
 			case CCharacterCommand::CC_FaceTowards:
 			case CCharacterCommand::CC_WaitForWeapon:
+			case CCharacterCommand::CC_VarSetAt:
 				command->y = (pRoom->wRoomRows-1) - command->y;
 			break;
 			case CCharacterCommand::CC_WaitForRect:
@@ -2986,6 +2988,37 @@ void CCharacter::Process(
 				//Wait until var X (comparison Y) W, e.g. X >= 5
 				if (!DoesVarSatisfy(command, pGame))
 					STOP_COMMAND;
+
+				bProcessNextCommand = true;
+			}
+			break;
+			case CCharacterCommand::CC_VarSetAt:
+			{
+				//Remotely set local variable w (with operation h) of NPC at (x,y)
+				UINT wX, wY;
+				bool success = false;
+				getCommandXY(command, wX, wY);
+
+				CMonster* pMonster = room.GetMonsterAtSquare(wX, wY);
+				if (pMonster) {
+					CCharacter* pCharacter = DYN_CAST(CCharacter*, CMonster* ,pMonster);
+					if (pCharacter) {
+						// Transfer var set information to a tempory command.
+						CCharacterCommand setCommand;
+						setCommand.x = command.w;
+						setCommand.y = command.h;
+						setCommand.w = command.flags;
+						setCommand.label = command.label;
+						pCharacter->SetVariable(setCommand, pGame, CueEvents);
+						success = true;
+					}
+				}
+
+				if (this->bIfBlock && !success) {
+					//As an if condition, query if the command was able to invoke
+					//remote variable set.
+					STOP_COMMAND;
+				}
 
 				bProcessNextCommand = true;
 			}
